@@ -11,3 +11,6 @@
 #rsync --recursive --times --links --hard-links --delete --delete-after rsync://mirror.anl.gov/ubuntu/dists/trusty/main/dist-upgrader-all/ /var/spool/apt-mirror/mirror/archive.ubuntu.com/ubuntu/dists/trusty/main/
 #rsync --recursive --times --links --hard-links --delete --delete-after rsync://mirror.anl.gov/ubuntu/dists/trusty/main/installer-amd64/ /var/spool/apt-mirror/mirror/archive.ubuntu.com/ubuntu/dists/trusty/main/
 #rsync --recursive --times --links --hard-links --delete --delete-after rsync://mirror.anl.gov/ubuntu/dists/trusty/main/installer-i386/ /var/spool/apt-mirror/mirror/archive.ubuntu.com/ubuntu/dists/trusty/main/
+
+[ -x /usr/local/bin/check-new-packages-downloaded-by-apt-mirror ] && /usr/local/bin/check-new-packages-downloaded-by-apt-mirror | tee -a /var/spool/apt-mirror/var/cron.log
+[ -x/usr/local/bin/apt-mirror-clean ] && /usr/local/bin/apt-mirror-clean | tee -a /var/spool/apt-mirror/var/cron.log

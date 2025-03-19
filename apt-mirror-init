@@ -1,0 +1,6 @@
+#!/bin/bash
+#
+# launch apt-mirror
+# 2020-2025 Esteban M. Navas Martín <algodelinux@gmail.com>
+
+/usr/bin/apt-mirror 2>&1 | tee /var/spool/apt-mirror/var/cron.log

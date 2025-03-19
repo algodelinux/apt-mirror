@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+# kill apt-mirror and clean it if it's running
+# 2020-2025 Esteban M. Navas Martín <algodelinux@gmail.com>
+
+apt_mirror_pid=$(/usr/bin/pgrep -x apt-mirror)
+
+if [ -n "$apt_mirror_pid" ]; then
+   kill -9 $apt_mirror_pid && check-new-packages-downloaded-by-apt-mirror; /var/spool/apt-mirror/var/clean.sh; apt-mirror --indexes
+fi

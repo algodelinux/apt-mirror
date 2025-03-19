@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+# check-new-packages-downloaded-by-apt-mirror:  Check new packages downloaded by apt-mirror and try download if the md5 hash is wrong
+# 2022-2023 Esteban M. Navas Martín <algodelinux@gmail.com>
+
+LOGDIR="/var/log/apt-mirror"
+LOGFILE="$LOGDIR/failed-md5.log"
+
+[ -d $LOGDIR ] || mkdir $LOGDIR
+
+:> $LOGFILE
+
+if [[ $1 != "" ]]; then
+   mirrorlist=$1
+else
+   mirrorlist="/etc/apt/mirror.list"
+fi
+
+BASE_PATH=$(grep -F "set base_path" $mirrorlist | grep -v ^# | sed -e "s/^.*set.base_path[[:space:]]*//")
+[ -z $BASE_PATH ] && BASE_PATH=$(grep -F "set base_path" $mirrorlist | sed -e "s/^.*set.base_path[[:space:]]*//")
+
+echo "Scanning list of last downloaded packages by apt-mirror using file: $BASE_PATH/var/NEW"
+echo "Reading and Checking MD5 checksum using file: $BASE_PATH/var/MD5"
+echo "Failed packages list will be stored in: $LOGDIR/failed-md5.log"
+
+while IFS='' read -r packageurl || [ -n "$packageurl" ]; do
+
+    package=$(echo $packageurl | sed 's#.*/##')
+
+    line=$(grep "$package" "$BASE_PATH/var/MD5")
+
+    if [ -n "$line" ]; then
+       echo "Checking: $line"
+
+       checksum=$(echo $line | cut -d' ' -f1)
+       filename=$(echo $line | cut -d' ' -f2)
+
+       echo "$checksum $BASE_PATH/mirror/$filename"
+       echo "$checksum $BASE_PATH/mirror/$filename" | md5sum -c -
+       RESULT=$?
+
+       if [ $RESULT -ne 0 ];then
+           # Tratamos de descargar el paquete cuyo hash no coincidía
+           wget -O $BASE_PATH/mirror/$filename $filename
+
+           # Comprobamos el hash del paquete que acabamos de descargar
+           echo "$checksum $BASE_PATH/mirror/$filename" | md5sum -c -
+           SUBRESULT=$?
+
+           if [ $SUBRESULT -ne 0 ];then
+               # Si el hash del fichero recien descargado tampoco coincide...
+               echo "Sorry failed checksum again for file: $BASE_PATH/mirror/$filename"
+               echo "$BASE_PATH/mirror/$filename failed" | tee -a $LOGFILE
+           fi
+       fi
+    fi
+done < "$BASE_PATH/var/NEW"

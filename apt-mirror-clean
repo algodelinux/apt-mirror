@@ -1,0 +1,4 @@
+#!/bin/bash
+
+/var/spool/apt-mirror/var/clean.sh
+

@@ -84,6 +84,7 @@ deb-src http://example.com/debian stable main contrib non-free
 
 Dmitry N. Hramtsov E<lt>hdn@nsu.ruE<gt>
 Brandon Holtsclaw E<lt>me@brandonholtsclaw.comE<gt>
+Esteban M. Navas Martin E<lt>algodelinux@gmail.comE<gt>
 
 =cut
 
@@ -94,6 +95,22 @@ use File::Compare;
 use File::Path qw(make_path);
 use File::Basename;
 use Fcntl qw(:flock);
+use Getopt::Long;
+
+my $download_indexes = 0;
+my $help = 0;
+
+GetOptions(
+    'indexes' => \$download_indexes,
+    'help'    => \$help,
+) or die("Error en los parámetros.\n");
+
+if ($help) {
+    print "Uso: $0 [--indexes] [--help]\n";
+    print "  --indexes  Descarga solo los índices de los repositorios.\n";
+    print "  --help     Muestra esta ayuda.\n";
+    exit;
+}
 
 my $config_file;
 
@@ -1050,6 +1067,13 @@ print "]\n\n";
 foreach my $fh (values %files_fh)
 {
     close $fh;
+}
+
+if ($download_indexes) {
+    print "Downloaded all indexes...\n";
+    exit;
+} else {
+    print "Building mirror...\n";
 }
 
 ######################################################################################

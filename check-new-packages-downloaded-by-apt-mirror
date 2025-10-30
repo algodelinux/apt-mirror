@@ -1,10 +1,11 @@
 #!/bin/bash
 #
 # check-new-packages-downloaded-by-apt-mirror:  Check new packages downloaded by apt-mirror and try download if the md5 hash is wrong
-# 2022-2023 Esteban M. Navas Martín <algodelinux@gmail.com>
+# 2022-2025 Esteban M. Navas Martín <algodelinux@gmail.com>
 
 LOGDIR="/var/log/apt-mirror"
 LOGFILE="$LOGDIR/failed-md5.log"
+RETRIES=3
 
 [ -d $LOGDIR ] || mkdir $LOGDIR
 
@@ -23,6 +24,38 @@ echo "Scanning list of last downloaded packages by apt-mirror using file: $BASE_
 echo "Reading and Checking MD5 checksum using file: $BASE_PATH/var/MD5"
 echo "Failed packages list will be stored in: $LOGDIR/failed-md5.log"
 
+# -----------------------------------------------------------
+# Función para descargar con reintentos
+# -----------------------------------------------------------
+download_with_retries() {
+    local url="$1"
+    local dest="$2"
+    local attempt
+    local success=false
+
+    for attempt in $(seq 1 $RETRIES); do
+        echo "  → Download attempt $attempt of $RETRIES: $url"
+        wget -q --timeout=30 --tries=3 -O "$dest" "$url"
+        if [ $? -eq 0 ]; then
+            echo "  ✓ Download succeeded: $dest"
+            success=true
+            break
+        else
+            echo "  ⚠️ Download failed, retrying..."
+            sleep 2
+        fi
+    done
+
+    if ! $success; then
+        echo "  ❌ Failed to download $dest after $RETRIES attempts" | tee -a "$LOGFILE"
+        return 1
+    fi
+    return 0
+}
+
+# -----------------------------------------------------------
+# Procesar paquetes
+# -----------------------------------------------------------
 while IFS='' read -r packageurl || [ -n "$packageurl" ]; do
 
     package=$(echo $packageurl | sed 's#.*/##')
@@ -34,23 +67,29 @@ while IFS='' read -r packageurl || [ -n "$packageurl" ]; do
 
        checksum=$(echo $line | cut -d' ' -f1)
        filename=$(echo $line | cut -d' ' -f2)
+       dest="$BASE_PATH/mirror/$filename"
 
+       # Si el paquete no existe en el mirror, tratamos de descargarlo
+       [ ! -f "$dest" ] && download_with_retries "$filename" "$dest"
+
+       # Comprobar MD5
        echo "$checksum $BASE_PATH/mirror/$filename"
        echo "$checksum $BASE_PATH/mirror/$filename" | md5sum -c -
        RESULT=$?
 
        if [ $RESULT -ne 0 ];then
            # Tratamos de descargar el paquete cuyo hash no coincidía
-           wget -O $BASE_PATH/mirror/$filename $filename
+           echo "Checksum failed, retrying download..."
+           download_with_retries "$filename" "$dest"
 
-           # Comprobamos el hash del paquete que acabamos de descargar
-           echo "$checksum $BASE_PATH/mirror/$filename" | md5sum -c -
+           # Volvemos a comprobar el hash del paquete que acabamos de descargar
+           echo "$checksum $dest" | md5sum -c -
            SUBRESULT=$?
 
            if [ $SUBRESULT -ne 0 ];then
                # Si el hash del fichero recien descargado tampoco coincide...
-               echo "Sorry failed checksum again for file: $BASE_PATH/mirror/$filename"
-               echo "$BASE_PATH/mirror/$filename failed" | tee -a $LOGFILE
+               echo "Sorry failed checksum again for file: $dest"
+               echo "$dest failed" | tee -a $LOGFILE
            fi
        fi
     fi

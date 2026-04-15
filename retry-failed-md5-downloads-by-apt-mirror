@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# check-new-packages-downloaded-by-apt-mirror:  Check new packages downloaded by apt-mirror and try download if the md5 hash is wrong
+# retry-failed-md5-downloads-by-apt-mirror:  Check failed packages downloaded by apt-mirror and try download if the md5 hash is wrong
 # 2022-2026 Esteban M. Navas Martín <algodelinux@gmail.com>
 
 RETRIES=3
@@ -14,11 +14,13 @@ fi
 BASE_PATH=$(grep -F "set base_path" $mirrorlist | grep -v ^# | sed -e "s/^.*set.base_path[[:space:]]*//")
 [ -z $BASE_PATH ] && BASE_PATH=$(grep -F "set base_path" $mirrorlist | sed -e "s/^.*set.base_path[[:space:]]*//")
 
-echo "Scanning list of last downloaded packages by apt-mirror using file: $BASE_PATH/var/NEW"
+echo "Scanning list of failed downloaded packages by apt-mirror using file: $BASE_PATH/var/FAILED"
 echo "Reading and Checking MD5 checksum using file: $BASE_PATH/var/MD5"
 echo "Failed packages list will be stored in: $BASE_PATH/var/FAILED"
 
+# -----------------------------------------------------------
 # Función para descargar con reintentos
+# -----------------------------------------------------------
 download_with_retries() {
     local url="$1"
     local dest="$2"
@@ -48,7 +50,10 @@ download_with_retries() {
     return 0
 }
 
+if [ -f "$BASE_PATH/var/FAILED" ]; then
+# -----------------------------------------------------------
 # Procesar paquetes
+# -----------------------------------------------------------
 while IFS='' read -r packageurl || [ -n "$packageurl" ]; do
 
     package=$(echo $packageurl | sed 's#.*/##')
@@ -86,6 +91,9 @@ while IFS='' read -r packageurl || [ -n "$packageurl" ]; do
                echo "Sorry failed checksum again for file: $dest"
                echo "$packageurl" | tee -a "$BASE_PATH/var/FAILED"
            fi
+       else
+          sed -i "\|${filename##*/}|d" "$BASE_PATH/var/FAILED"
        fi
     fi
-done < "$BASE_PATH/var/NEW"
+done < "$BASE_PATH/var/FAILED"
+fi
